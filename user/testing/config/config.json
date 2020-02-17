@@ -1,0 +1,16 @@
+{
+    "REDIS_ADDRESS": "localhost:6379",
+    "REDIS_DB": "0",
+    "REDIS_STREAM_GROUP": "booking_group",
+    "MONGO_DB_URL": "localhost:27017",
+    "MONGO_DB_NAME": "booking",
+    "BOOKING_COLL": "booking",
+    "POLI_COLL": "poli",
+    "ANTRIAN_COLL": "antrian",
+    "MONGO_EVENTSTORE_URL": "localhost:27017",
+    "MONGO_EVENTSTORE_NAME": "eventstore",
+    "MONGO_EVENTSTORE_COLLECTION": "eventstore",
+    "BOOKING_CHANNEL": "booking_channel",
+    "POLI_CHANNEL": "poli_channel",
+    "ANTRIAN_CHANNEL": "antrian_channel"
+}
