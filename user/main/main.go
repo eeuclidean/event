@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"event/user/event/consumer"
+	"event/user/consumer"
 	"event/user/gokit"
 	"event/user/service"
 	"flag"

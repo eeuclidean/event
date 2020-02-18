@@ -4,7 +4,7 @@ import (
 	"errors"
 	"event/user/aggregates"
 	"event/user/commands"
-	"event/user/event/publisher"
+	"event/user/publisher"
 	"event/user/repositories"
 
 	"strconv"
