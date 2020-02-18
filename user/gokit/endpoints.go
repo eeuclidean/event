@@ -14,44 +14,44 @@ func NewEndPoints(svc service.Service, logger log.Logger, duration metrics.Histo
 	var createBookingEndPoint endpoint.Endpoint
 	{
 		createBookingEndPoint = makeCreateBookingEndPoint(svc)
-		createBookingEndPoint = LoggingMiddleware(log.With(logger, "method", "CreateBooking"))(createBookingEndPoint)
-		createBookingEndPoint = InstrumentingLatencyMiddleware(duration.With("method", "CreateBooking"))(createBookingEndPoint)
+		createBookingEndPoint = loggingMiddleware(log.With(logger, "method", "CreateBooking"))(createBookingEndPoint)
+		createBookingEndPoint = instrumentingLatencyMiddleware(duration.With("method", "CreateBooking"))(createBookingEndPoint)
 	}
 	var cancelBookingEndPoint endpoint.Endpoint
 	{
 		cancelBookingEndPoint = makeCancelBookingEndPoint(svc)
-		cancelBookingEndPoint = LoggingMiddleware(log.With(logger, "method", "CancelBooking"))(cancelBookingEndPoint)
-		cancelBookingEndPoint = InstrumentingLatencyMiddleware(duration.With("method", "CancelBooking"))(cancelBookingEndPoint)
+		cancelBookingEndPoint = loggingMiddleware(log.With(logger, "method", "CancelBooking"))(cancelBookingEndPoint)
+		cancelBookingEndPoint = instrumentingLatencyMiddleware(duration.With("method", "CancelBooking"))(cancelBookingEndPoint)
 	}
 	var payBookingEndPoint endpoint.Endpoint
 	{
 		payBookingEndPoint = makePayBookingEndPoint(svc)
-		payBookingEndPoint = LoggingMiddleware(log.With(logger, "method", "PayBooking"))(payBookingEndPoint)
-		payBookingEndPoint = InstrumentingLatencyMiddleware(duration.With("method", "PayBooking"))(payBookingEndPoint)
+		payBookingEndPoint = loggingMiddleware(log.With(logger, "method", "PayBooking"))(payBookingEndPoint)
+		payBookingEndPoint = instrumentingLatencyMiddleware(duration.With("method", "PayBooking"))(payBookingEndPoint)
 	}
 	var callBookingEndPoint endpoint.Endpoint
 	{
 		callBookingEndPoint = makeCallBookingEndPoint(svc)
-		callBookingEndPoint = LoggingMiddleware(log.With(logger, "method", "CallBooking"))(callBookingEndPoint)
-		callBookingEndPoint = InstrumentingLatencyMiddleware(duration.With("method", "CallBooking"))(callBookingEndPoint)
+		callBookingEndPoint = loggingMiddleware(log.With(logger, "method", "CallBooking"))(callBookingEndPoint)
+		callBookingEndPoint = instrumentingLatencyMiddleware(duration.With("method", "CallBooking"))(callBookingEndPoint)
 	}
 	var loketCheckinBookingEndPoint endpoint.Endpoint
 	{
 		loketCheckinBookingEndPoint = makeCheckinLoketEndPoint(svc)
-		loketCheckinBookingEndPoint = LoggingMiddleware(log.With(logger, "method", "LoketCheckinBooking"))(loketCheckinBookingEndPoint)
-		loketCheckinBookingEndPoint = InstrumentingLatencyMiddleware(duration.With("method", "LoketCheckinBooking"))(loketCheckinBookingEndPoint)
+		loketCheckinBookingEndPoint = loggingMiddleware(log.With(logger, "method", "LoketCheckinBooking"))(loketCheckinBookingEndPoint)
+		loketCheckinBookingEndPoint = instrumentingLatencyMiddleware(duration.With("method", "LoketCheckinBooking"))(loketCheckinBookingEndPoint)
 	}
 	var poliCheckinBookingEndPoint endpoint.Endpoint
 	{
 		poliCheckinBookingEndPoint = makeCheckinPoliEndPoint(svc)
-		poliCheckinBookingEndPoint = LoggingMiddleware(log.With(logger, "method", "PoliCheckinBooking"))(poliCheckinBookingEndPoint)
-		poliCheckinBookingEndPoint = InstrumentingLatencyMiddleware(duration.With("method", "PoliCheckinBooking"))(poliCheckinBookingEndPoint)
+		poliCheckinBookingEndPoint = loggingMiddleware(log.With(logger, "method", "PoliCheckinBooking"))(poliCheckinBookingEndPoint)
+		poliCheckinBookingEndPoint = instrumentingLatencyMiddleware(duration.With("method", "PoliCheckinBooking"))(poliCheckinBookingEndPoint)
 	}
 	var updateAntrianEndPoint endpoint.Endpoint
 	{
 		updateAntrianEndPoint = makeUpdateAntrianEndPoint(svc)
-		updateAntrianEndPoint = LoggingMiddleware(log.With(logger, "method", "UpdateAntrian"))(updateAntrianEndPoint)
-		updateAntrianEndPoint = InstrumentingLatencyMiddleware(duration.With("method", "UpdateAntrian"))(updateAntrianEndPoint)
+		updateAntrianEndPoint = loggingMiddleware(log.With(logger, "method", "UpdateAntrian"))(updateAntrianEndPoint)
+		updateAntrianEndPoint = instrumentingLatencyMiddleware(duration.With("method", "UpdateAntrian"))(updateAntrianEndPoint)
 	}
 	return Endpoints{
 		CreateBookingEndPoint:       createBookingEndPoint,

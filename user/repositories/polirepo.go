@@ -1,4 +1,4 @@
-package polirepo
+package repositories
 
 import (
 	"event/user/aggregates"

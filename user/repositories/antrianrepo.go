@@ -1,4 +1,4 @@
-package antrianrepo
+package repositories
 
 import (
 	"event/user/aggregates"

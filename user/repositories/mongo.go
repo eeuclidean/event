@@ -1,4 +1,4 @@
-package utilsmongo
+package repositories
 
 import (
 	"errors"
@@ -14,14 +14,7 @@ const (
 	MONGO_DB_NAME     = "MONGO_DB_NAME"
 )
 
-func GetCollection(collectionName string) (*mgo.Collection, error) {
-	db, err := MongoDBLogin()
-	if err != nil {
-		return nil, err
-	}
-	return db.C(collectionName), nil
-}
-func MongoDBLogin() (*mgo.Database, error) {
+func mongoDBLogin() (*mgo.Database, error) {
 	return loginDB(os.Getenv(MONGO_DB_URL), os.Getenv(MONGO_DB_NAME), os.Getenv(MONGO_DB_USERNAME), os.Getenv(MONGO_DB_PASSWORD))
 }
 

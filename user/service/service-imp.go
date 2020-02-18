@@ -1,72 +1,32 @@
 package service
 
 import (
-	"bookingsvr/booking/event"
 	"errors"
 	"event/user/aggregates"
 	"event/user/commands"
 	"event/user/event/publisher"
-	"event/user/repositories/antrianrepo"
-	"event/user/repositories/bookingrepo"
-	"event/user/repositories/branchrepo"
-	"event/user/repositories/polirepo"
-	"event/user/repositories/schedulerepo"
+	"event/user/repositories"
 
 	"strconv"
-
-	"github.com/eeuclidean/eventsourcing/publisher"
 )
 
 const ERR_PREFIX = "400 "
 
 func NewService() (Service, error) {
-	bookingRepo, err := bookingrepo.NewMongoAdapterBookingRepo()
+	repo, err := repositories.NewRepositories()
 	if err != nil {
 		return ServiceImpl{}, err
 	}
-	poliRepo, err := polirepo.NewMongoAdapterPoliRepo()
-	if err != nil {
-		return ServiceImpl{}, err
-	}
-	antrianRepo, err := antrianrepo.NewMongoAdapterAntrianRepo()
-	if err != nil {
-		return ServiceImpl{}, err
-	}
-	branchRepo, err := branchrepo.NewMongoAdapterBranchRepo()
-	if err != nil {
-		return ServiceImpl{}, err
-	}
-	scheduleRepo, err := schedulerepo.NewMongoAdapterScheduleRepo()
-	if err != nil {
-		return ServiceImpl{}, err
-	}
-	bookingEventPublisher, err := event.NewBookingRedisEventPublisher()
-	if err != nil {
-		return ServiceImpl{}, err
-	}
-	antrianEventPublisher, err := event.NewAntrianRedisEventPublisher()
-	if err != nil {
-		return ServiceImpl{}, err
-	}
+	eventPublisher := publisher.NewEventPublisher()
 	return ServiceImpl{
-		BookingRepo:           bookingRepo,
-		PoliRepo:              poliRepo,
-		AntrianRepo:           antrianRepo,
-		ScheduleRepo:          scheduleRepo,
-		BranchRepo:            branchRepo,
-		BookingEventPublisher: bookingEventPublisher,
-		AntrianEventPublisher: antrianEventPublisher,
+		Repositories:   repo,
+		EventPublisher: eventPublisher,
 	}, nil
 }
 
 type ServiceImpl struct {
-	BookingRepo           bookingrepo.BookingRepository
-	PoliRepo              polirepo.PoliRepository
-	AntrianRepo           antrianrepo.AntrianRepository
-	BranchRepo            branchrepo.BranchRepository
-	ScheduleRepo          schedulerepo.ScheduleRepository
-	BookingEventPublisher publisher.DomainEventPublisher
-	AntrianEventPublisher publisher.DomainEventPublisher
+	Repositories   repositories.Repositories
+	EventPublisher publisher.EventPublisher
 }
 
 func (svc ServiceImpl) CreateBooking(command commands.AddBookingCommand) (string, error) {
@@ -79,17 +39,17 @@ func (svc ServiceImpl) CreateBooking(command commands.AddBookingCommand) (string
 	if err != nil {
 		return "", err
 	}
-	poli, err := svc.PoliRepo.Get(command.PoliID)
+	poli, err := svc.Repositories.GetPoliRepository().Get(command.PoliID)
 	if err != nil {
 		return "", err
 	}
 	date, month, year, _ := command.GetDateMonthYear()
-	_, err = svc.ScheduleRepo.GetByDate(command.PoliID, year, month, date)
+	_, err = svc.Repositories.GetScheduleRepository().GetByDate(command.PoliID, year, month, date)
 	if err == nil {
 		return "", errors.New("Tanggal " + command.Tanggal + " libur")
 	}
 	if command.SubPoliID != "" {
-		_, err = svc.ScheduleRepo.GetByDate(command.SubPoliID, year, month, date)
+		_, err = svc.Repositories.GetScheduleRepository().GetByDate(command.SubPoliID, year, month, date)
 		if err == nil {
 			return "", errors.New("Tanggal " + command.Tanggal + " libur")
 		}
@@ -102,11 +62,11 @@ func (svc ServiceImpl) CreateBooking(command commands.AddBookingCommand) (string
 			return "", errors.New("Maksimum Waktu Booking Jam " + strconv.Itoa(poli.CloseTime))
 		}
 	}
-	branch, err := svc.BranchRepo.Get(poli.BranchID)
+	branch, err := svc.Repositories.GetBranchRepository().Get(poli.BranchID)
 	if err != nil {
 		return "", err
 	}
-	bookings, err := svc.BookingRepo.GetManyByPatientIDAndDate(command.BranchID, command.PatientID, command.Tanggal)
+	bookings, err := svc.Repositories.GetBookingResository().GetManyByPatientIDAndDate(command.BranchID, command.PatientID, command.Tanggal)
 	if err != nil {
 		return "", err
 	}
@@ -114,11 +74,11 @@ func (svc ServiceImpl) CreateBooking(command commands.AddBookingCommand) (string
 		return "", errors.New("Limit Booking " + strconv.Itoa(branch.MaxBookingPerDay) + " kali")
 	}
 	antrianBranch := aggregates.NewAntrianBranch(poli, command.Tanggal)
-	err = svc.AntrianRepo.Save(antrianBranch)
+	err = svc.Repositories.GetAntrianRepository().Save(antrianBranch)
 	if err != nil {
-		if err.Error() == antrianrepo.ANTRIAN_EXIST {
+		if err.Error() == repositories.ANTRIAN_EXIST {
 			var err error
-			antrianBranch, err = svc.AntrianRepo.GetAntrianBranch(command.GetAntrainBranchID(), antrianrepo.REGISTER_CONTEXT)
+			antrianBranch, err = svc.Repositories.GetAntrianRepository().GetAntrianBranch(command.GetAntrainBranchID(), repositories.REGISTER_CONTEXT)
 			if err != nil {
 				return "", err
 			}
@@ -126,15 +86,15 @@ func (svc ServiceImpl) CreateBooking(command commands.AddBookingCommand) (string
 			return "", err
 		}
 	}
-	if err := svc.AntrianEventPublisher.Publish(antrianBranch.GetDomainEvent()); err != nil {
+	if err := svc.EventPublisher.PublishAntrianEvent(antrianBranch); err != nil {
 		return "", err
 	}
 	antrianPoli := aggregates.NewAntrianPoli(poli, command.Tanggal)
-	err = svc.AntrianRepo.Save(antrianPoli)
+	err = svc.Repositories.GetAntrianRepository().Save(antrianPoli)
 	if err != nil {
-		if err.Error() == antrianrepo.ANTRIAN_EXIST {
+		if err.Error() == repositories.ANTRIAN_EXIST {
 			var err error
-			antrianPoli, err = svc.AntrianRepo.GetAntrianPoli(command.GetAntrainPoliID(), antrianrepo.REGISTER_CONTEXT)
+			antrianPoli, err = svc.Repositories.GetAntrianRepository().GetAntrianPoli(command.GetAntrainPoliID(), repositories.REGISTER_CONTEXT)
 			if err != nil {
 				return "", err
 			}
@@ -142,37 +102,39 @@ func (svc ServiceImpl) CreateBooking(command commands.AddBookingCommand) (string
 			return "", err
 		}
 	}
-	if err := svc.AntrianEventPublisher.Publish(antrianPoli.GetDomainEvent()); err != nil {
+	if err := svc.EventPublisher.PublishAntrianEvent(antrianPoli); err != nil {
 		return "", err
 	}
 	booking := aggregates.NewBooking(command, antrianBranch.Terisi, poli.PayAmount)
-	err = svc.BookingEventPublisher.Publish(booking.GetDomainEvent())
+	err = svc.EventPublisher.PublishBookingEvent(booking)
 	if err != nil {
 		return "", err
 	}
-	err = svc.BookingRepo.Save(booking)
+	err = svc.Repositories.GetBookingResository().Save(booking)
 	if err != nil {
 		return "", err
 	}
 	return booking.ID, nil
 }
+
 func (svc ServiceImpl) CallBooking(command commands.CallBookingCommand) error {
-	booking, err := svc.BookingRepo.Get(command.ID)
+	booking, err := svc.Repositories.GetBookingResository().Get(command.ID)
 	if err != nil {
 		return err
 	}
 	if booking.IsToday() {
 		booking.Call()
-		err = svc.BookingRepo.Update(booking)
+		err = svc.Repositories.GetBookingResository().Update(booking)
 		if err != nil {
 			return err
 		}
-		return svc.BookingEventPublisher.Publish(booking.GetDomainEvent())
+		return svc.EventPublisher.PublishBookingEvent(booking)
 	}
 	return errors.New("Bukan Hari Ini")
 }
+
 func (svc ServiceImpl) CheckInLoketBooking(command commands.LoketCheckinBookingCommand) error {
-	booking, err := svc.BookingRepo.Get(command.ID)
+	booking, err := svc.Repositories.GetBookingResository().Get(command.ID)
 	if err != nil {
 		return err
 	}
@@ -180,31 +142,31 @@ func (svc ServiceImpl) CheckInLoketBooking(command commands.LoketCheckinBookingC
 		if err := booking.SetStatusLoketCheckin(command); err != nil {
 			return err
 		}
-		antrianBranch, err := svc.AntrianRepo.GetAntrianBranch(booking.AntrianBranchID, antrianrepo.CHECKIN_CONTEXT)
+		antrianBranch, err := svc.Repositories.GetAntrianRepository().GetAntrianBranch(booking.AntrianBranchID, repositories.CHECKIN_CONTEXT)
 		if err != nil {
 			return err
 		}
-		if err := svc.AntrianEventPublisher.Publish(antrianBranch.GetDomainEvent()); err != nil {
+		if err := svc.EventPublisher.PublishAntrianEvent(antrianBranch); err != nil {
 			return err
 		}
-		antrianPoli, err := svc.AntrianRepo.GetAntrianPoli(booking.AntrianPoliID, antrianrepo.CHECKIN_CONTEXT)
+		antrianPoli, err := svc.Repositories.GetAntrianRepository().GetAntrianPoli(booking.AntrianPoliID, repositories.CHECKIN_CONTEXT)
 		if err != nil {
 			return err
 		}
-		if err := svc.AntrianEventPublisher.Publish(antrianPoli.GetDomainEvent()); err != nil {
+		if err := svc.EventPublisher.PublishAntrianEvent(antrianPoli); err != nil {
 			return err
 		}
 		booking.NoAntrianPoli = antrianPoli.Checkin
-		err = svc.BookingRepo.Update(booking)
+		err = svc.Repositories.GetBookingResository().Update(booking)
 		if err != nil {
 			return err
 		}
-		return svc.BookingEventPublisher.Publish(booking.GetDomainEvent())
+		return svc.EventPublisher.PublishBookingEvent(booking)
 	}
 	return errors.New("Bukan Hari Ini")
 }
 func (svc ServiceImpl) CheckInPoliBooking(command commands.PoliCheckinBookingCommand) error {
-	booking, err := svc.BookingRepo.Get(command.ID)
+	booking, err := svc.Repositories.GetBookingResository().Get(command.ID)
 	if err != nil {
 		return err
 	}
@@ -212,24 +174,24 @@ func (svc ServiceImpl) CheckInPoliBooking(command commands.PoliCheckinBookingCom
 		if err := booking.SetStatusPoliCheckIn(command.By); err != nil {
 			return err
 		}
-		antrianPoli, err := svc.AntrianRepo.GetAntrianPoli(booking.AntrianPoliID, antrianrepo.FINISH_CONTEXT)
+		antrianPoli, err := svc.Repositories.GetAntrianRepository().GetAntrianPoli(booking.AntrianPoliID, repositories.FINISH_CONTEXT)
 		if err != nil {
 			return err
 		}
-		if err := svc.AntrianEventPublisher.Publish(antrianPoli.GetDomainEvent()); err != nil {
+		if err := svc.EventPublisher.PublishAntrianEvent(antrianPoli); err != nil {
 			return err
 		}
-		err = svc.BookingRepo.Update(booking)
+		err = svc.Repositories.GetBookingResository().Update(booking)
 		if err != nil {
 			return err
 		}
-		return svc.BookingEventPublisher.Publish(booking.GetDomainEvent())
+		return svc.EventPublisher.PublishBookingEvent(booking)
 	}
 	return errors.New("Bukan Hari Ini")
 }
 
 func (svc ServiceImpl) PayBooking(command commands.PayBookingCommand) error {
-	booking, err := svc.BookingRepo.Get(command.ID)
+	booking, err := svc.Repositories.GetBookingResository().Get(command.ID)
 	if err != nil {
 		return err
 	}
@@ -237,63 +199,63 @@ func (svc ServiceImpl) PayBooking(command commands.PayBookingCommand) error {
 		if err := booking.SetStatusPayed(command); err != nil {
 			return err
 		}
-		err = svc.BookingRepo.Update(booking)
+		err = svc.Repositories.GetBookingResository().Update(booking)
 		if err != nil {
 			return err
 		}
-		return svc.BookingEventPublisher.Publish(booking.GetDomainEvent())
+		return svc.EventPublisher.PublishBookingEvent(booking)
 	}
 	return errors.New("Bukan Hari Ini")
 }
 func (svc ServiceImpl) CancelBooking(command commands.CancelBookingCommand) error {
-	booking, err := svc.BookingRepo.Get(command.ID)
+	booking, err := svc.Repositories.GetBookingResository().Get(command.ID)
 	if err != nil {
 		return err
 	}
 	if err := booking.SetStatusCanceled(); err != nil {
 		return err
 	}
-	antrianPoli, err := svc.AntrianRepo.GetAntrianPoli(booking.AntrianPoliID, antrianrepo.CANCEL_CONTEXT)
+	antrianPoli, err := svc.Repositories.GetAntrianRepository().GetAntrianPoli(booking.AntrianPoliID, repositories.CANCEL_CONTEXT)
 	if err != nil {
 		return err
 	}
-	err = svc.AntrianEventPublisher.Publish(antrianPoli.GetDomainEvent())
+	err = svc.EventPublisher.PublishAntrianEvent(antrianPoli)
 	if err != nil {
 		return err
 	}
-	antrianBranch, err := svc.AntrianRepo.GetAntrianBranch(booking.AntrianBranchID, antrianrepo.CANCEL_CONTEXT)
+	antrianBranch, err := svc.Repositories.GetAntrianRepository().GetAntrianBranch(booking.AntrianBranchID, repositories.CANCEL_CONTEXT)
 	if err != nil {
 		return err
 	}
-	err = svc.AntrianEventPublisher.Publish(antrianBranch.GetDomainEvent())
+	err = svc.EventPublisher.PublishAntrianEvent(antrianBranch)
 	if err != nil {
 		return err
 	}
-	err = svc.BookingRepo.Update(booking)
+	err = svc.Repositories.GetBookingResository().Update(booking)
 	if err != nil {
 		return err
 	}
-	return svc.BookingEventPublisher.Publish(booking.GetDomainEvent())
+	return svc.EventPublisher.PublishBookingEvent(booking)
 }
 
 func (svc ServiceImpl) UpdateAntrian(command commands.UpdateAntrianCommand) error {
-	poli, err := svc.PoliRepo.Get(command.PoliID)
+	poli, err := svc.Repositories.GetPoliRepository().Get(command.PoliID)
 	if err != nil {
 		return err
 	}
 	antrianPoli := aggregates.NewEmptyAntrianPoli(poli, command.Tanggal)
-	err = svc.AntrianRepo.Save(antrianPoli)
+	err = svc.Repositories.GetAntrianRepository().Save(antrianPoli)
 	if err != nil {
-		if err.Error() == antrianrepo.ANTRIAN_EXIST {
+		if err.Error() == repositories.ANTRIAN_EXIST {
 			var err error
-			antrianPoli, err = svc.AntrianRepo.Get(command.GetAntrainPoliID())
+			antrianPoli, err = svc.Repositories.GetAntrianRepository().Get(command.GetAntrainPoliID())
 			if err != nil {
 				return err
 			}
-			if err := svc.AntrianRepo.UpdateAntrianKuota(antrianPoli.ID, command.Kuota); err != nil {
+			if err := svc.Repositories.GetAntrianRepository().UpdateAntrianKuota(antrianPoli.ID, command.Kuota); err != nil {
 				return err
 			}
-			antrianPoli, err = svc.AntrianRepo.Get(command.GetAntrainPoliID())
+			antrianPoli, err = svc.Repositories.GetAntrianRepository().Get(command.GetAntrainPoliID())
 			if err != nil {
 				return err
 			}
@@ -301,26 +263,26 @@ func (svc ServiceImpl) UpdateAntrian(command commands.UpdateAntrianCommand) erro
 			return err
 		}
 	}
-	return svc.AntrianEventPublisher.Publish(antrianPoli.GetDomainEvent())
+	return svc.EventPublisher.PublishAntrianEvent(antrianPoli)
 
 }
 func (svc ServiceImpl) AddPoli(poli aggregates.Poli) error {
-	return svc.PoliRepo.Save(poli)
+	return svc.Repositories.GetPoliRepository().Save(poli)
 }
 func (svc ServiceImpl) UpdatePoli(poli aggregates.Poli) error {
-	return svc.PoliRepo.Update(poli)
+	return svc.Repositories.GetPoliRepository().Update(poli)
 }
 
 func (svc ServiceImpl) AddBranch(branch aggregates.Branch) error {
-	return svc.BranchRepo.Save(branch)
+	return svc.Repositories.GetBranchRepository().Save(branch)
 }
 func (svc ServiceImpl) UpdateBranch(branch aggregates.Branch) error {
-	return svc.BranchRepo.Update(branch)
+	return svc.Repositories.GetBranchRepository().Update(branch)
 }
 
 func (svc ServiceImpl) AddSchedule(schedule aggregates.Schedule) error {
-	return svc.ScheduleRepo.Save(schedule)
+	return svc.Repositories.GetScheduleRepository().Save(schedule)
 }
 func (svc ServiceImpl) UpdateSchedule(schedule aggregates.Schedule) error {
-	return svc.ScheduleRepo.Update(schedule)
+	return svc.Repositories.GetScheduleRepository().Update(schedule)
 }

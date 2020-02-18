@@ -1,30 +1,19 @@
-package handlers
+package consumer
 
 import (
+	"encoding/json"
 	"event/user/aggregates"
 	"event/user/service"
-	"encoding/json"
 
 	"github.com/eeuclidean/eventsourcing"
 )
 
-const (
-	BRANCH_CHANNEL = "BRANCH_CHANNEL"
-)
-
-func NewBranchEventConsumerHandler(service service.Service, log func(functionName string, msg string)) BranchEventConsumerHandler {
-	return BranchEventConsumerHandler{
-		Service: service,
-		Log:     log,
-	}
-}
-
-type BranchEventConsumerHandler struct {
+type branchEventConsumerHandler struct {
 	Service service.Service
 	Log     func(functionName string, msg string)
 }
 
-func (consumer BranchEventConsumerHandler) Apply(event eventsourcing.Event) error {
+func (consumer branchEventConsumerHandler) Apply(event eventsourcing.Event) error {
 	consumer.Log("Apply", "start")
 	var branch aggregates.Branch
 	err := json.Unmarshal([]byte(event.Data), &branch)

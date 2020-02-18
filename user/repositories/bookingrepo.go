@@ -1,4 +1,4 @@
-package bookingrepo
+package repositories
 
 import (
 	"event/user/aggregates"

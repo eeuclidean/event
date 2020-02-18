@@ -1,30 +1,19 @@
-package handlers
+package consumer
 
 import (
+	"encoding/json"
 	"event/user/aggregates"
 	"event/user/service"
-	"encoding/json"
 
 	"github.com/eeuclidean/eventsourcing"
 )
 
-const (
-	POLI_CHANNEL = "POLI_CHANNEL"
-)
-
-func NewPoliEventConsumerHandler(service service.Service, log func(functionName string, msg string)) PoliEventConsumerHandler {
-	return PoliEventConsumerHandler{
-		Service: service,
-		Log:     log,
-	}
-}
-
-type PoliEventConsumerHandler struct {
+type poliEventConsumerHandler struct {
 	Service service.Service
 	Log     func(functionName string, msg string)
 }
 
-func (consumer PoliEventConsumerHandler) Apply(event eventsourcing.Event) error {
+func (consumer poliEventConsumerHandler) Apply(event eventsourcing.Event) error {
 	switch event.EventName {
 	case aggregates.POLI_EVENT_NAME:
 		var poli aggregates.Poli

@@ -1,4 +1,4 @@
-package schedulerepo
+package repositories
 
 import (
 	"event/user/aggregates"

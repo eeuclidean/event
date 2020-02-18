@@ -1,4 +1,4 @@
-package branchrepo
+package repositories
 
 import (
 	"event/user/aggregates"

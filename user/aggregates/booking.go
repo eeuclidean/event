@@ -1,11 +1,8 @@
 package aggregates
 
 import (
-	"encoding/json"
 	"errors"
 	"event/user/commands"
-	"event/user/utils/utilsgenerator"
-	"github.com/eeuclidean/eventsourcing"
 	"strconv"
 	"strings"
 	"time"
@@ -19,15 +16,9 @@ const (
 	BOOKING_POLI_CHECKEDIN  = "booking_poli_checkedin"
 )
 
-const (
-	BOOKING_EVENT_NAME   = "booking"
-	BOOKING_DATA_NAME    = "booking"
-	BOOKING_SERVICE_NAME = "booking_service"
-)
-
 func NewBooking(command commands.AddBookingCommand, noantrian int, amount int) Booking {
 	return Booking{
-		ID:              utilsgenerator.NewID(),
+		ID:              generateID(),
 		PatientID:       command.PatientID,
 		BranchID:        command.BranchID,
 		PoliID:          command.PoliID,
@@ -145,17 +136,5 @@ func (booking *Booking) getStatusMsg() string {
 		return "Pasien Sudah Checkin Di Poli"
 	default:
 		return "Terjadi Kesalahan"
-	}
-}
-
-func (booking *Booking) GetDomainEvent() eventsourcing.Event {
-	data, _ := json.Marshal(booking)
-	return eventsourcing.Event{
-		EventType: booking.Status,
-		EventName: BOOKING_EVENT_NAME,
-		DataID:    booking.ID,
-		DataName:  BOOKING_DATA_NAME,
-		Data:      string(data),
-		CreateBy:  BOOKING_SERVICE_NAME,
 	}
 }

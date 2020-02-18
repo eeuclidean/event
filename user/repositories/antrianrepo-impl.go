@@ -1,16 +1,11 @@
-package antrianrepo
+package repositories
 
 import (
-	"event/user/aggregates"
-	"event/user/utils/utilsmongo"
 	"errors"
+	"event/user/aggregates"
+
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"os"
-)
-
-const (
-	ANTRIAN_COLL = "ANTRIAN_COLL"
 )
 
 const (
@@ -24,24 +19,13 @@ const (
 	CANCEL_CONTEXT   = "cancel"
 )
 
-func NewMongoAdapterAntrianRepo() (AntrianRepository, error) {
-	db, err := utilsmongo.MongoDBLogin()
-	if err != nil {
-		return MongoAdapterAntrianRepo{}, err
-	}
-	return MongoAdapterAntrianRepo{
-		Collection:     db.C(os.Getenv(ANTRIAN_COLL)),
-		CircuitBreaker: utilsmongo.NewCircuitBreaker(db),
-	}, nil
+type mongoAdapterAntrianRepo struct {
+	Collection  *mgo.Collection
+	ConnChecker *connectionChecker
 }
 
-type MongoAdapterAntrianRepo struct {
-	Collection     *mgo.Collection
-	CircuitBreaker *utilsmongo.MongoCircuitBreaker
-}
-
-func (adapter MongoAdapterAntrianRepo) Save(antrian aggregates.Antrian) error {
-	return adapter.CircuitBreaker.Execute(func() error {
+func (adapter mongoAdapterAntrianRepo) Save(antrian aggregates.Antrian) error {
+	return adapter.ConnChecker.Execute(func() error {
 		err := adapter.Collection.Insert(antrian)
 		if err != nil {
 			if mgo.IsDup(err) {
@@ -52,22 +36,22 @@ func (adapter MongoAdapterAntrianRepo) Save(antrian aggregates.Antrian) error {
 	})
 }
 
-func (adapter MongoAdapterAntrianRepo) UpdateAntrianKuota(antrianid string, kuota int) error {
-	return adapter.CircuitBreaker.Execute(func() error {
+func (adapter mongoAdapterAntrianRepo) UpdateAntrianKuota(antrianid string, kuota int) error {
+	return adapter.ConnChecker.Execute(func() error {
 		return adapter.Collection.UpdateId(antrianid, bson.M{"$set": bson.M{"kuota": kuota, "status": aggregates.ANTRIAN_UPDATED}})
 	})
 }
 
-func (adapter MongoAdapterAntrianRepo) Get(antrianid string) (aggregates.Antrian, error) {
+func (adapter mongoAdapterAntrianRepo) Get(antrianid string) (aggregates.Antrian, error) {
 	var antrian aggregates.Antrian
-	err := adapter.CircuitBreaker.Execute(func() error {
+	err := adapter.ConnChecker.Execute(func() error {
 		return adapter.Collection.FindId(antrianid).One(&antrian)
 	})
 	return antrian, err
 }
-func (adapter MongoAdapterAntrianRepo) GetAntrianPoli(antrianid string, context string) (aggregates.Antrian, error) {
+func (adapter mongoAdapterAntrianRepo) GetAntrianPoli(antrianid string, context string) (aggregates.Antrian, error) {
 	var antrian aggregates.Antrian
-	err := adapter.CircuitBreaker.Execute(func() error {
+	err := adapter.ConnChecker.Execute(func() error {
 		if context == REGISTER_CONTEXT {
 			var existingAntrian aggregates.Antrian
 			err := adapter.Collection.FindId(antrianid).One(&existingAntrian)
@@ -100,9 +84,9 @@ func (adapter MongoAdapterAntrianRepo) GetAntrianPoli(antrianid string, context 
 	return antrian, err
 }
 
-func (adapter MongoAdapterAntrianRepo) GetAntrianBranch(antrianid string, context string) (aggregates.Antrian, error) {
+func (adapter mongoAdapterAntrianRepo) GetAntrianBranch(antrianid string, context string) (aggregates.Antrian, error) {
 	var antrian aggregates.Antrian
-	err := adapter.CircuitBreaker.Execute(func() error {
+	err := adapter.ConnChecker.Execute(func() error {
 		if context == REGISTER_CONTEXT {
 			err := adapter.Collection.UpdateId(antrianid, bson.M{"$inc": bson.M{context: 1}, "$set": bson.M{"status": aggregates.ANTRIAN_UPDATED}})
 			if err != nil {
